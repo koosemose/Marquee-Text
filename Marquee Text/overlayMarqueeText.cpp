@@ -89,9 +89,9 @@ PLUGIN_EXPORT void PluginSetDefaultVars()
 {
 	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_COLOR, RGB(255, 255, 255));
 	PC_SetPluginVar(m_dwPluginID, VAR_BACKGROUND_COLOR, 0);
-	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_FAMILY, L"Consolas");
-	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_SIZE, 24);
-	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_STYLE, (int)0);	// flags: 1 - bold, 2 - italic
+	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_FAMILY, L"Consolas");
+	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_SIZE, 24);
+	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_STYLE, (int)0);	// flags: 1 - bold, 2 - italic
 	PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, 1);
 }
 
@@ -114,9 +114,9 @@ PLUGIN_EXPORT void PluginUpdateVars()
 	bShowBackground = PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND);
 	SAFE_DELETE(pFPSFont);
 	pFPSFont = new Gdiplus::Font(
-		PC_GetPluginVarStr(m_dwPluginID, VAR_FPS_FONT_FAMILY),
-		(float)PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_SIZE),
-		PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_STYLE));
+		PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FONT_FAMILY),
+		(float)PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_SIZE),
+		PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE));
 
 
 	struct stat attrib;
@@ -288,7 +288,7 @@ static void SetFontButtonText(HWND dlg)
 		bBold ? L"bold" : L"",
 		bItalic ? L"italic" : L""
 		);
-	SetWindowText(GetDlgItem(dlg, IDC_FPS_FONT), fontstr);
+	SetWindowText(GetDlgItem(dlg, IDC_TEXT_FONT), fontstr);
 }
 
 static void InitSettingsDialog(HWND hwnd)
@@ -299,10 +299,10 @@ static void InitSettingsDialog(HWND hwnd)
 
 	dwTextColor = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_COLOR);
 	dwBackgroundColor = PC_GetPluginVarInt(m_dwPluginID, VAR_BACKGROUND_COLOR);
-	bItalic = (PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_STYLE) & 2) != 0;
-	bBold = (PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_STYLE) & 1) != 0;
-	szFontFamily = PC_GetPluginVarStr(m_dwPluginID, VAR_FPS_FONT_FAMILY);
-	dwFontSize = PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_SIZE);
+	bItalic = (PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE) & 2) != 0;
+	bBold = (PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE) & 1) != 0;
+	szFontFamily = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FONT_FAMILY);
+	dwFontSize = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_SIZE);
 
 	Button_SetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND), PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND) != 0 ? BST_CHECKED : BST_UNCHECKED);
 	SetFontButtonText(hwnd);
@@ -339,11 +339,11 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_COLOR, dwTextColor);
 				PC_SetPluginVar(m_dwPluginID, VAR_BACKGROUND_COLOR, dwBackgroundColor);
 
-				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_FAMILY, szFontFamily.c_str());
-				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_SIZE, dwFontSize);
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_FAMILY, szFontFamily.c_str());
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_SIZE, dwFontSize);
 				PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, Button_GetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND)) == BST_CHECKED);
 				int style = (bBold ? 1 : 0) | (bItalic ? 2 : 0);
-				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_STYLE, style);
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_STYLE, style);
 			}
 
 			EndDialog(hwnd, id);
@@ -366,7 +366,7 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 			}
 		}
 
-		if (id == IDC_FPS_FONT)
+		if (id == IDC_TEXT_FONT)
 		{
 			LOGFONT lf = { 0 };
 			lf.lfItalic = bItalic;
