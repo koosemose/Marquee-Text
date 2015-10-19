@@ -32,7 +32,7 @@ Gdiplus::SolidBrush*	pFPSRecordBrush = 0;
 Gdiplus::SolidBrush*	pFPSBackBrush = 0;
 Gdiplus::SolidBrush*	pFPSScreenIndicatorBrush = 0;
 
-BOOL					bDrawScreenshotIndicator = false;
+BOOL					bShowBackground = true;
 wchar_t trig[256];
 BOOL					bFirstAttach = true;
 BOOL					bTriggered = false;
@@ -79,29 +79,20 @@ void startRecording()
 
 PLUGIN_EXPORT const char* PluginGetTitle()
 {
-	return "FPS_PLUGIN";
+	return "TEXT_MARQUEE_PLUGIN";
 }
-
-#define VAR_NORMAL_COLOR		"normal_color"
-#define VAR_RECORD_COLOR		"record_color"
-#define VAR_FPS_FONT_FAMILY		"fps_font.family"
-#define VAR_FPS_FONT_SIZE		"fps_font.size"
-#define VAR_FPS_FONT_STYLE		"fps_font.style"
-
-// hack! :)
-#define profile_screenshot_indicator_color	"screenshot.indicator_color"
-#define profile_screenshot_indicator "screenshot.indicator"
 
 //
 //	Set default variables
 //
 PLUGIN_EXPORT void PluginSetDefaultVars()
 {
-	PC_SetPluginVar(m_dwPluginID, VAR_NORMAL_COLOR, RGB(255, 255, 0));
-	PC_SetPluginVar(m_dwPluginID, VAR_RECORD_COLOR, RGB(255, 0, 0));
+	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_COLOR, RGB(255, 255, 255));
+	PC_SetPluginVar(m_dwPluginID, VAR_BACKGROUND_COLOR, 0);
 	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_FAMILY, L"Consolas");
-	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_SIZE, 30);
+	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_SIZE, 24);
 	PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_STYLE, (int)0);	// flags: 1 - bold, 2 - italic
+	PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, 1);
 }
 
 //
@@ -112,19 +103,15 @@ PLUGIN_EXPORT void PluginUpdateVars()
 	DWORD clr;
 
 	SAFE_DELETE(pFPSNormalBrush);
-	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_NORMAL_COLOR);
+	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_COLOR);
 	pFPSNormalBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
 
 	SAFE_DELETE(pFPSRecordBrush);
-	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_RECORD_COLOR);
+	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_BACKGROUND_COLOR);
 	pFPSRecordBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
 
-	SAFE_DELETE(pFPSScreenIndicatorBrush);
-	clr = PC_GetPluginVarInt(-1, profile_screenshot_indicator_color);
-	pFPSScreenIndicatorBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetBValue(clr), GetGValue(clr), GetRValue(clr)));	// swap red blue
 
-	bDrawScreenshotIndicator = PC_GetPluginVarInt(-1, profile_screenshot_indicator) == SCREENSHOT_INDICATOR_FPS_COLOR;
-
+	bShowBackground = PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND);
 	SAFE_DELETE(pFPSFont);
 	pFPSFont = new Gdiplus::Font(
 		PC_GetPluginVarStr(m_dwPluginID, VAR_FPS_FONT_FAMILY),
@@ -151,8 +138,6 @@ PLUGIN_EXPORT void PluginUpdateVars()
 		myfile.close();
 	}
 	textLength = textContents.length();
-	//std::wstring widestr = std::wstring(textContents.begin(), textContents.end());
-	//swprintf_s(trig, L"%s", widestr);
 	trig[textLength] = 0;
 	std::copy(textContents.begin(), textContents.end(), trig);
 	
@@ -205,8 +190,6 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 	if (!pRenderHelper)
 		return;
 
-//	swprintf_s(trig, L"%d", cycleCount);
-
 	// lock overlay image
 	auto pLock = pRenderHelper->BeginFrame();
 	if (!pLock)
@@ -218,7 +201,7 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 	Gdiplus::Graphics *pGraphics = pRenderHelper->GetGraphics();
 
 	//-----------------------------------------
-	// draw FPS counter
+	// draw Text Overlay
 
 	// set options
 	pGraphics->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -228,12 +211,9 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 
 	WCHAR s[128];
 	_itow_s(PC_GetConfirmedProcessID(), s, 10);
-	//WCHAR *trig = L""+cycleCount;
 	struct stat attrib;
 	stat("C:/Users/Koosemose/Desktop/Snip/Snip.txt", &attrib);
 	time_t modifyTime = attrib.st_mtime;
-	//swprintf_s(trig, L"%d", oldModifyTime);
-	//string textContents = "";
 	if (modifyTime > oldModifyTime) {
 		oldModifyTime = modifyTime;
 		string line;
@@ -245,34 +225,30 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 			while (getline(myfile, line))
 			{
 				textContents += line;
-				//cout << line << '\n';
 			}
 			myfile.close();
 		}
 		textLength = textContents.length();
-		//std::wstring widestr = std::wstring(textContents.begin(), textContents.end());
-		//swprintf_s(trig, L"%s", widestr);
 		trig[textLength] = 0;
 		std::copy(textContents.begin(), textContents.end(), trig);
 	}
 	// draw back if required
-	//if (bDrawScreenshotIndicator && PC_GetDeltaScreenshotTime() < 500)
+	if (bShowBackground)
 	{
 		Gdiplus::RectF bound;
 		pRenderHelper->GetTextExtent(trig, pFPSFont, &bound);
 		pGraphics->FillRectangle(pFPSRecordBrush, bound);
 	}
 
-	// draw fps
+	// draw text
 
 	Gdiplus::RectF bound;
 	pRenderHelper->GetTextExtent(trig, pFPSFont, &bound);
-	//swprintf_s(trig, L"%d - %d", w, bound.Width);
+
 	if (bound.Width > w) {
 		wchar_t newtrig[256];
 		newtrig[textLength * 2 + 5] = 0;
 
-		//newtrig[wcslen(trig) * 2 + 5] = 0;
 		swprintf_s(newtrig, L"%s     %s", trig, trig);
 		Gdiplus::RectF newbound;
 		pRenderHelper->GetTextExtent(newtrig, pFPSFont, &newbound);
@@ -298,7 +274,7 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 
 //////////////////////////////////////////////////////////////////////////
 
-DWORD dwNormalColor, dwRecordColor;
+DWORD dwTextColor, dwBackgroundColor;
 BOOL bItalic, bBold;
 wstring szFontFamily;
 DWORD dwFontSize;
@@ -321,13 +297,14 @@ static void InitSettingsDialog(HWND hwnd)
 
 	PC_LocalizeDialog(m_dwPluginID, hwnd);
 
-	dwNormalColor = PC_GetPluginVarInt(m_dwPluginID, VAR_NORMAL_COLOR);
-	dwRecordColor = PC_GetPluginVarInt(m_dwPluginID, VAR_RECORD_COLOR);
+	dwTextColor = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_COLOR);
+	dwBackgroundColor = PC_GetPluginVarInt(m_dwPluginID, VAR_BACKGROUND_COLOR);
 	bItalic = (PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_STYLE) & 2) != 0;
 	bBold = (PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_STYLE) & 1) != 0;
 	szFontFamily = PC_GetPluginVarStr(m_dwPluginID, VAR_FPS_FONT_FAMILY);
 	dwFontSize = PC_GetPluginVarInt(m_dwPluginID, VAR_FPS_FONT_SIZE);
 
+	Button_SetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND), PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND) != 0 ? BST_CHECKED : BST_UNCHECKED);
 	SetFontButtonText(hwnd);
 }
 
@@ -359,11 +336,12 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 		{
 			if (id == IDOK)
 			{
-				PC_SetPluginVar(m_dwPluginID, VAR_NORMAL_COLOR, dwNormalColor);
-				PC_SetPluginVar(m_dwPluginID, VAR_RECORD_COLOR, dwRecordColor);
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_COLOR, dwTextColor);
+				PC_SetPluginVar(m_dwPluginID, VAR_BACKGROUND_COLOR, dwBackgroundColor);
 
 				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_FAMILY, szFontFamily.c_str());
 				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_SIZE, dwFontSize);
+				PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, Button_GetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND)) == BST_CHECKED);
 				int style = (bBold ? 1 : 0) | (bItalic ? 2 : 0);
 				PC_SetPluginVar(m_dwPluginID, VAR_FPS_FONT_STYLE, style);
 			}
@@ -371,9 +349,9 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 			EndDialog(hwnd, id);
 		}
 
-		if (id == IDC_NORMAL_COLOR_BTN || id == IDC_RECORD_COLOR_BTN)
+		if (id == IDC_TEXT_COLOR_BTN || id == IDC_BACKGROUND_COLOR_BTN)
 		{
-			DWORD &color_var = (id == IDC_NORMAL_COLOR_BTN) ? dwNormalColor : dwRecordColor;
+			DWORD &color_var = (id == IDC_TEXT_COLOR_BTN) ? dwTextColor : dwBackgroundColor;
 			COLORREF custColors[16];
 			CHOOSECOLOR cc = { 0 };
 			cc.lStructSize = sizeof(cc);
@@ -423,10 +401,10 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 	case WM_DRAWITEM:
 	{
 		auto lpDIS = (LPDRAWITEMSTRUCT)lParam;
-		if (lpDIS->CtlID == IDC_NORMAL_COLOR_BTN)
-			DrawColorButton(lpDIS, dwNormalColor);
-		if (lpDIS->CtlID == IDC_RECORD_COLOR_BTN)
-			DrawColorButton(lpDIS, dwRecordColor);
+		if (lpDIS->CtlID == IDC_TEXT_COLOR_BTN)
+			DrawColorButton(lpDIS, dwTextColor);
+		if (lpDIS->CtlID == IDC_BACKGROUND_COLOR_BTN)
+			DrawColorButton(lpDIS, dwBackgroundColor);
 		break;
 	}
 
