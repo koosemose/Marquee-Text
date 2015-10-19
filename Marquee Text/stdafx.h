@@ -16,7 +16,7 @@
 
 using namespace std;
 
-#include "C:/Program Files (x86)/PlayClaw 5 Plus/plugins/sdk/plugins_helper.h"
+#include "../plugins_helper.h"
 
 
 
