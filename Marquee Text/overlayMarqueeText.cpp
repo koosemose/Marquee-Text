@@ -5,8 +5,8 @@
 #include "resource.h"
 #include<iostream>
 #include<fstream>
-#include <sys/stat.h>
 
+#include <shobjidl.h> 
 // add your own path for PlayClaw5.lib
 #ifdef _DEBUG
 #pragma comment(lib, "../playclaw5.lib")
@@ -29,12 +29,14 @@ Gdiplus::Pen*			pAxisPen = 0;
 Gdiplus::Font*			pFont = 0;
 
 BOOL					bShowBackground = true;
-wchar_t wcTextContents[256];
+wchar_t					wcTextContents[256];
+
+const WCHAR					*pFileName = L"";
 
 int						cycleCount = 0;
 int						scroll = 0;
 int						textLength = 0;
-time_t					oldModifyTime;
+FILETIME					oldModifyTime;
 
 //
 //	Init plugin
@@ -77,6 +79,8 @@ PLUGIN_EXPORT void PluginSetDefaultVars()
 	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_SIZE, 24);
 	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_STYLE, (int)0);	// flags: 1 - bold, 2 - italic
 	PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, 1);
+	PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FILE, L"");
+
 }
 
 //
@@ -103,15 +107,17 @@ PLUGIN_EXPORT void PluginUpdateVars()
 		(float)PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_SIZE),
 		PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE));
 
+	//SAFE_DELETE(pFileName);
+	pFileName = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FILE);
 
-	struct stat attrib;
-	stat("C:/Users/Koosemose/Desktop/Snip/Snip.txt", &attrib);
-	time_t modifyTime = attrib.st_mtime;
-	
+	WIN32_FILE_ATTRIBUTE_DATA       attribs;
+	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+
+	FILETIME modifyTime = attribs.ftLastWriteTime;
 	oldModifyTime = modifyTime;
 	string line;
 	ifstream myfile;
-	myfile.open("C:/Users/Koosemose/Desktop/Snip/Snip.txt");
+	myfile.open(pFileName);
 	string textContents = "";
 	if (myfile.is_open())
 	{
@@ -178,14 +184,16 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 
 	WCHAR s[128];
 	_itow_s(PC_GetConfirmedProcessID(), s, 10);
-	struct stat attrib;
-	stat("C:/Users/Koosemose/Desktop/Snip/Snip.txt", &attrib);
-	time_t modifyTime = attrib.st_mtime;
-	if (modifyTime > oldModifyTime) {
+	
+	WIN32_FILE_ATTRIBUTE_DATA       attribs;
+	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+	
+	FILETIME modifyTime = attribs.ftLastWriteTime;
+	if (CompareFileTime(&modifyTime, &oldModifyTime) >0) {
 		oldModifyTime = modifyTime;
 		string line;
 		ifstream myfile;
-		myfile.open("C:/Users/Koosemose/Desktop/Snip/Snip.txt");
+		myfile.open(pFileName);
 		string textContents = "";
 		if (myfile.is_open())
 		{
@@ -237,6 +245,7 @@ DWORD dwTextColor, dwBackgroundColor;
 BOOL bItalic, bBold;
 wstring szFontFamily;
 DWORD dwFontSize;
+wstring szFileName;
 
 static void SetFontButtonText(HWND dlg)
 {
@@ -248,6 +257,14 @@ static void SetFontButtonText(HWND dlg)
 		bItalic ? L"italic" : L""
 		);
 	SetWindowText(GetDlgItem(dlg, IDC_TEXT_FONT), fontstr);
+}
+
+static void SetFileNameButtonText(HWND dlg)
+{
+	WCHAR filestr[128];
+	wsprintf(filestr, L"%s",
+		szFileName.c_str());
+	SetWindowText(GetDlgItem(dlg, IDC_TEXT_FILE), filestr);
 }
 
 static void InitSettingsDialog(HWND hwnd)
@@ -262,9 +279,10 @@ static void InitSettingsDialog(HWND hwnd)
 	bBold = (PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE) & 1) != 0;
 	szFontFamily = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FONT_FAMILY);
 	dwFontSize = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_SIZE);
-
+	szFileName = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FILE);
 	Button_SetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND), PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND) != 0 ? BST_CHECKED : BST_UNCHECKED);
 	SetFontButtonText(hwnd);
+	SetFileNameButtonText(hwnd);
 }
 
 static void DrawColorButton(LPDRAWITEMSTRUCT lpDIS, COLORREF clr)
@@ -297,8 +315,9 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 			{
 				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_COLOR, dwTextColor);
 				PC_SetPluginVar(m_dwPluginID, VAR_BACKGROUND_COLOR, dwBackgroundColor);
-
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FILE, szFileName.c_str());
 				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_FAMILY, szFontFamily.c_str());
+				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FILE, szFileName.c_str());
 				PC_SetPluginVar(m_dwPluginID, VAR_TEXT_FONT_SIZE, dwFontSize);
 				PC_SetPluginVar(m_dwPluginID, VAR_SHOW_BACKGROUND, Button_GetCheck(GetDlgItem(hwnd, IDC_SHOW_BACKGROUND)) == BST_CHECKED);
 				int style = (bBold ? 1 : 0) | (bItalic ? 2 : 0);
@@ -349,6 +368,56 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 				SetFontButtonText(hwnd);
 			}
 			ReleaseDC(hwnd, dc);
+
+		}
+		if (id == IDC_TEXT_FILE) {
+			HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
+				COINIT_DISABLE_OLE1DDE);
+			if (SUCCEEDED(hr))
+			{
+				IFileOpenDialog *pFileOpen;
+				COMDLG_FILTERSPEC rgSpec[] =
+				{
+					{ L"Text Files", L"*.txt" },
+					{ L"All Files", L"*.*" },
+				};
+				// Create the FileOpenDialog object.
+				hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+					IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
+
+				if (SUCCEEDED(hr))
+				{
+					// Show the Open dialog box.
+					pFileOpen->SetFileTypes(2,rgSpec);
+					
+					hr = pFileOpen->Show(NULL);
+
+					// Get the file name from the dialog box.
+					if (SUCCEEDED(hr))
+					{
+						IShellItem *pItem;
+						hr = pFileOpen->GetResult(&pItem);
+						if (SUCCEEDED(hr))
+						{
+							PWSTR pszFilePath;
+							hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+							// Display the file name to the user.
+							if (SUCCEEDED(hr))
+							{
+								//MessageBox(NULL, pszFilePath, L"File Path", MB_OK);
+								//szFileName = L"CATS";
+								szFileName = pszFilePath;
+								SetFileNameButtonText(hwnd);
+								CoTaskMemFree(pszFilePath);
+							}
+							pItem->Release();
+						}
+					}
+					pFileOpen->Release();
+				}
+				CoUninitialize();
+			}
 
 		}
 

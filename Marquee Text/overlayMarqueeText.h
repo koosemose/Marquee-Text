@@ -5,3 +5,4 @@
 #define VAR_TEXT_FONT_SIZE		"text_font.size"
 #define VAR_TEXT_FONT_STYLE		"text_font.style"
 #define VAR_SHOW_BACKGROUND			"show_background"
+#define VAR_TEXT_FILE			"text_file"
