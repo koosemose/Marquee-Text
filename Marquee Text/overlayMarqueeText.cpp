@@ -63,7 +63,7 @@ void startRecording()
 
 PLUGIN_EXPORT const char* PluginGetTitle()
 {
-	return "TEXT_MARQUEE_PLUGIN";
+	return "MARQUEE_TEXT_PLUGIN";
 }
 
 //
