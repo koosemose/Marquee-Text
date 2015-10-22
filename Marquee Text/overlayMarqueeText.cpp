@@ -26,22 +26,15 @@ Gdiplus::Font*			pTextFont = 0;
 Gdiplus::Pen*			pGraphPen = 0;
 Gdiplus::Pen*			pAxisPen = 0;
 
-Gdiplus::Font*			pFPSFont = 0;
-Gdiplus::SolidBrush*	pFPSNormalBrush = 0;
-Gdiplus::SolidBrush*	pFPSRecordBrush = 0;
-Gdiplus::SolidBrush*	pFPSBackBrush = 0;
-Gdiplus::SolidBrush*	pFPSScreenIndicatorBrush = 0;
+Gdiplus::Font*			pFont = 0;
 
 BOOL					bShowBackground = true;
-wchar_t trig[256];
-BOOL					bFirstAttach = true;
-BOOL					bTriggered = false;
+wchar_t wcTextContents[256];
 
 int						cycleCount = 0;
 int						scroll = 0;
 int						textLength = 0;
 time_t					oldModifyTime;
-#define SCREENSHOT_INDICATOR_FPS_COLOR 1
 
 //
 //	Init plugin
@@ -59,21 +52,12 @@ PLUGIN_EXPORT DWORD PluginInit(DWORD dwPluginID)
 	pTextBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255, 255));
 	pTextFont = new Gdiplus::Font(L"System", 8, Gdiplus::FontStyleBold);
 
-	pFPSBackBrush = new Gdiplus::SolidBrush(Gdiplus::Color(200, 0, 0, 0));
+	pBackBrush = new Gdiplus::SolidBrush(Gdiplus::Color(200, 0, 0, 0));
 	return PC_PLUGIN_FLAG_IS_ACTIVE | PC_PLUGIN_FLAG_IS_OVERLAY;	// plugin is active and has overlay features
 }
 
 void startRecording()
 {
-	while (bFirstAttach) {
-		if (bFirstAttach && PC_GetConfirmedProcessID() != -1) {
-			bFirstAttach = false;
-			if (!PC_IsRecording()) {
-				PC_StartRecording();
-				bTriggered = true;
-			}
-		}
-	}
 
 }
 
@@ -102,18 +86,19 @@ PLUGIN_EXPORT void PluginUpdateVars()
 {
 	DWORD clr;
 
-	SAFE_DELETE(pFPSNormalBrush);
+	SAFE_DELETE(pTextBrush);
 	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_COLOR);
-	pFPSNormalBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
+	pTextBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
 
-	SAFE_DELETE(pFPSRecordBrush);
+	SAFE_DELETE(pBackBrush);
 	clr = PC_GetPluginVarInt(m_dwPluginID, VAR_BACKGROUND_COLOR);
-	pFPSRecordBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
+	pBackBrush = new Gdiplus::SolidBrush(Gdiplus::Color(255, GetRValue(clr), GetGValue(clr), GetBValue(clr)));
+
 
 
 	bShowBackground = PC_GetPluginVarInt(m_dwPluginID, VAR_SHOW_BACKGROUND);
-	SAFE_DELETE(pFPSFont);
-	pFPSFont = new Gdiplus::Font(
+	SAFE_DELETE(pFont);
+	pFont = new Gdiplus::Font(
 		PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FONT_FAMILY),
 		(float)PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_SIZE),
 		PC_GetPluginVarInt(m_dwPluginID, VAR_TEXT_FONT_STYLE));
@@ -138,8 +123,8 @@ PLUGIN_EXPORT void PluginUpdateVars()
 		myfile.close();
 	}
 	textLength = textContents.length();
-	trig[textLength] = 0;
-	std::copy(textContents.begin(), textContents.end(), trig);
+	wcTextContents[textLength] = 0;
+	std::copy(textContents.begin(), textContents.end(), wcTextContents);
 	
 
 
@@ -150,11 +135,9 @@ PLUGIN_EXPORT void PluginUpdateVars()
 //
 PLUGIN_EXPORT void PluginShutdown()
 {
-	SAFE_DELETE(pFPSFont);
-	SAFE_DELETE(pFPSNormalBrush);
-	SAFE_DELETE(pFPSRecordBrush);
-	SAFE_DELETE(pFPSBackBrush);
-	SAFE_DELETE(pFPSScreenIndicatorBrush);
+	SAFE_DELETE(pFont);
+	SAFE_DELETE(pTextBrush);
+	SAFE_DELETE(pBackBrush);
 
 	SAFE_DELETE(pBackBrush);
 	SAFE_DELETE(pAxisPen);
@@ -163,22 +146,6 @@ PLUGIN_EXPORT void PluginShutdown()
 	SAFE_DELETE(pTextFont);
 
 	SAFE_DELETE(pRenderHelper);
-}
-
-int max_fps = 110;
-int min_fps = 5;
-std::vector<int>	fps_array;
-
-void GetFPSBounds(int max_fps, int &max_bound)
-{
-	max_bound = 1;
-	while (max_fps > 9)
-	{
-		max_fps /= 10;
-		max_bound *= 10;
-	}
-	max_fps++;	// next number
-	max_bound *= max_fps;
 }
 
 //
@@ -229,44 +196,36 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 			myfile.close();
 		}
 		textLength = textContents.length();
-		trig[textLength] = 0;
-		std::copy(textContents.begin(), textContents.end(), trig);
+		wcTextContents[textLength] = 0;
+		std::copy(textContents.begin(), textContents.end(), wcTextContents);
 	}
 	// draw back if required
 	if (bShowBackground)
 	{
 		Gdiplus::RectF bound;
-		pRenderHelper->GetTextExtent(trig, pFPSFont, &bound);
-		pGraphics->FillRectangle(pFPSRecordBrush, bound);
+		pRenderHelper->GetTextExtent(wcTextContents, pFont, &bound);
+		pGraphics->FillRectangle(pBackBrush, bound);
 	}
 
 	// draw text
 
 	Gdiplus::RectF bound;
-	pRenderHelper->GetTextExtent(trig, pFPSFont, &bound);
+	pRenderHelper->GetTextExtent(wcTextContents, pFont, &bound);
 
 	if (bound.Width > w) {
-		wchar_t newtrig[256];
-		newtrig[textLength * 2 + 5] = 0;
-
-		swprintf_s(newtrig, L"%s     %s", trig, trig);
+		wchar_t wcNewTextContents[256];
+		wcNewTextContents[textLength * 2 + 5] = 0;
+		swprintf_s(wcNewTextContents, L"%s     %s", wcTextContents, wcTextContents);
 		Gdiplus::RectF newbound;
-		pRenderHelper->GetTextExtent(newtrig, pFPSFont, &newbound);
-		if (PC_IsRecording())
-			pRenderHelper->DrawString(newtrig, pFPSFont, Gdiplus::Point(0 - scroll, 0), pFPSRecordBrush, pFPSBackBrush);
-		else
-			pRenderHelper->DrawString(newtrig, pFPSFont, Gdiplus::Point(0 - scroll, 0), pFPSNormalBrush, pFPSBackBrush);
+		pRenderHelper->GetTextExtent(wcNewTextContents, pFont, &newbound);
+		pRenderHelper->DrawString(wcNewTextContents, pFont, Gdiplus::Point(0 - scroll, 0), pTextBrush, pBackBrush);
 		scroll+=2;
 		if (scroll > newbound.Width - bound.Width)
 			scroll = 0;
 	}
 	else {
-		if (PC_IsRecording())
-			pRenderHelper->DrawString(trig, pFPSFont, Gdiplus::Point(0, 0), pFPSRecordBrush, pFPSBackBrush);
-		else
-			pRenderHelper->DrawString(trig, pFPSFont, Gdiplus::Point(0, 0), pFPSNormalBrush, pFPSBackBrush);
+		pRenderHelper->DrawString(wcTextContents, pFont, Gdiplus::Point(0, 0), pTextBrush, pBackBrush);
 	}
-
 	// fill overlay image
 	pRenderHelper->EndFrame();
 
@@ -422,5 +381,5 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 //
 PLUGIN_EXPORT void PluginConfigure(HWND parent)
 {
-	DialogBox(GetDllInstance(), MAKEINTRESOURCE(IDD_FPS_CONFIG_DLG), parent, DlgProc);
+	DialogBox(GetDllInstance(), MAKEINTRESOURCE(IDD_MT_CONFIG_DLG), parent, DlgProc);
 }
