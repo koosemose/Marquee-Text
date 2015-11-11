@@ -71,11 +71,45 @@ PLAYCLAW_API void				PC_StopPureCapture();
 PLAYCLAW_API BYTE*				PC_CaptureFrame(BYTE *pBufferRGB24, DWORD *pdwWidth, DWORD *pdwHeight);
 
 
+//---------------- events -------------------------
+
+// temporary interface for playclaw events
+// currently in test and it can be changed
+// use this export in plugin to get events:
+// PLUGIN_EXPORT void PluginEventCallback(DWORD eventType)
+
+enum PlayClawEventTypeEnum
+{
+	PCEVENT_ACTIVE_PROCESS_CHANGED = 0,		// use PC_GetConfirmedProcessID() to get new active process ID
+
+	PCEVENT_NUM_EVENTS
+};
+
 
 //--------------- misc functions -------------------
 
+struct PlayClawStateStruct
+{
+	DWORD						dwSize;	// size of structure
+	DWORD						dwFPS;
+
+	BOOL						bCapturing;
+	BOOL						bRecording;
+	BOOL						bRecordingPaused;
+	BOOL						bPreRecording;
+	BOOL						bStreaming;
+
+	DWORD						dwRecordedFileSize;
+	DWORD						dwRecordedFileTime;
+	DWORD						dwPreRecordedDataSize;
+	DWORD						dwStreamedSize;
+	DWORD						dwCaptureSkipped;
+	DWORD						dwEncoderSkipped;
+};
+
 // realtime info from game
 PLAYCLAW_API DWORD				PC_GetFPSCounter();
+PLAYCLAW_API void				PC_GetState(PlayClawStateStruct *pState);
 
 // capture/recording/streaming 
 PLAYCLAW_API BOOL				PC_IsCapturing();
@@ -90,6 +124,8 @@ PLAYCLAW_API DWORD				PC_GetRecordedFileTime();	// in seconds
 PLAYCLAW_API DWORD				PC_GetPreRecordedDataSize();	// in msec
 PLAYCLAW_API DWORD				PC_GetStreamedSize();	// in kbytes
 PLAYCLAW_API DWORD				PC_GetStreamState();
+PLAYCLAW_API DWORD				PC_GetCaptureSkipped();
+PLAYCLAW_API DWORD				PC_GetEncoderSkipped();
 PLAYCLAW_API DWORD				PC_GetDeltaScreenshotTime();
 
 // common system functions
