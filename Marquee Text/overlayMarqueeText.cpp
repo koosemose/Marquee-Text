@@ -5,8 +5,12 @@
 #include "resource.h"
 #include<iostream>
 #include<fstream>
+#include "Shlwapi.h"
 
 #include <shobjidl.h> 
+
+//TODO: Implement protection for nonexistent file & Blank file name
+
 // add your own path for PlayClaw5.lib
 #ifdef _DEBUG
 #pragma comment(lib, "../playclaw5.lib")
@@ -109,29 +113,31 @@ PLUGIN_EXPORT void PluginUpdateVars()
 
 	//SAFE_DELETE(pFileName);
 	pFileName = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FILE);
-
-	WIN32_FILE_ATTRIBUTE_DATA       attribs;
-	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
-
-	FILETIME modifyTime = attribs.ftLastWriteTime;
-	oldModifyTime = modifyTime;
-	string line;
-	ifstream myfile;
-	myfile.open(pFileName);
 	string textContents = "";
-	if (myfile.is_open())
-	{
-		while (getline(myfile, line))
+	if (PathFileExists(pFileName)) {
+		WIN32_FILE_ATTRIBUTE_DATA       attribs;
+		GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+
+		FILETIME modifyTime = attribs.ftLastWriteTime;
+		oldModifyTime = modifyTime;
+		string line;
+		ifstream myfile;
+
+		myfile.open(pFileName);
+		if (myfile.is_open())
 		{
-			textContents += line;
-			//cout << line << '\n';
+			while (getline(myfile, line))
+			{
+				textContents += line;
+				//cout << line << '\n';
+			}
+			myfile.close();
 		}
-		myfile.close();
 	}
 	textLength = textContents.length();
 	wcTextContents[textLength] = 0;
 	std::copy(textContents.begin(), textContents.end(), wcTextContents);
-	
+
 
 
 }
@@ -181,31 +187,32 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 
 	// clear back
 	pGraphics->Clear(Gdiplus::Color(0, 0, 0, 0));
-
-	WCHAR s[128];
+		WCHAR s[128];
 	_itow_s(PC_GetConfirmedProcessID(), s, 10);
-	
-	WIN32_FILE_ATTRIBUTE_DATA       attribs;
-	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
-	
-	FILETIME modifyTime = attribs.ftLastWriteTime;
-	if (CompareFileTime(&modifyTime, &oldModifyTime) >0) {
-		oldModifyTime = modifyTime;
-		string line;
-		ifstream myfile;
-		myfile.open(pFileName);
+
+	if (PathFileExists(pFileName)) {
 		string textContents = "";
-		if (myfile.is_open())
-		{
-			while (getline(myfile, line))
+		WIN32_FILE_ATTRIBUTE_DATA       attribs;
+		GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+
+		FILETIME modifyTime = attribs.ftLastWriteTime;
+		if (CompareFileTime(&modifyTime, &oldModifyTime) > 0) {
+			oldModifyTime = modifyTime;
+			string line;
+			ifstream myfile;
+			myfile.open(pFileName);
+			if (myfile.is_open())
 			{
-				textContents += line;
+				while (getline(myfile, line))
+				{
+					textContents += line;
+				}
+				myfile.close();
 			}
-			myfile.close();
+			textLength = textContents.length();
+			wcTextContents[textLength] = 0;
+			std::copy(textContents.begin(), textContents.end(), wcTextContents);
 		}
-		textLength = textContents.length();
-		wcTextContents[textLength] = 0;
-		std::copy(textContents.begin(), textContents.end(), wcTextContents);
 	}
 	// draw back if required
 	if (bShowBackground)
@@ -227,7 +234,7 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 		Gdiplus::RectF newbound;
 		pRenderHelper->GetTextExtent(wcNewTextContents, pFont, &newbound);
 		pRenderHelper->DrawString(wcNewTextContents, pFont, Gdiplus::Point(0 - scroll, 0), pTextBrush, pBackBrush);
-		scroll+=2;
+		scroll += 2;
 		if (scroll > newbound.Width - bound.Width)
 			scroll = 0;
 	}
@@ -388,8 +395,8 @@ static INT_PTR CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 				if (SUCCEEDED(hr))
 				{
 					// Show the Open dialog box.
-					pFileOpen->SetFileTypes(2,rgSpec);
-					
+					pFileOpen->SetFileTypes(2, rgSpec);
+
 					hr = pFileOpen->Show(NULL);
 
 					// Get the file name from the dialog box.
