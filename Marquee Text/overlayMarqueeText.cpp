@@ -5,12 +5,8 @@
 #include "resource.h"
 #include<iostream>
 #include<fstream>
-#include "Shlwapi.h"
 
 #include <shobjidl.h> 
-
-//TODO: Implement protection for nonexistent file & Blank file name
-
 // add your own path for PlayClaw5.lib
 #ifdef _DEBUG
 #pragma comment(lib, "../playclaw5.lib")
@@ -113,26 +109,24 @@ PLUGIN_EXPORT void PluginUpdateVars()
 
 	//SAFE_DELETE(pFileName);
 	pFileName = PC_GetPluginVarStr(m_dwPluginID, VAR_TEXT_FILE);
+
+	WIN32_FILE_ATTRIBUTE_DATA       attribs;
+	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+
+	FILETIME modifyTime = attribs.ftLastWriteTime;
+	oldModifyTime = modifyTime;
+	string line;
+	ifstream myfile;
+	myfile.open(pFileName);
 	string textContents = "";
-	if (PathFileExists(pFileName)) {
-		WIN32_FILE_ATTRIBUTE_DATA       attribs;
-		GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
-
-		FILETIME modifyTime = attribs.ftLastWriteTime;
-		oldModifyTime = modifyTime;
-		string line;
-		ifstream myfile;
-
-		myfile.open(pFileName);
-		if (myfile.is_open())
+	if (myfile.is_open())
+	{
+		while (getline(myfile, line))
 		{
-			while (getline(myfile, line))
-			{
-				textContents += line;
-				//cout << line << '\n';
-			}
-			myfile.close();
+			textContents += line;
+			//cout << line << '\n';
 		}
+		myfile.close();
 	}
 	textLength = textContents.length();
 	wcTextContents[textLength] = 0;
@@ -187,35 +181,31 @@ PLUGIN_EXPORT void PluginUpdateOverlay()
 
 	// clear back
 	pGraphics->Clear(Gdiplus::Color(0, 0, 0, 0));
-	PlayClawStateStruct *pState = 0;
-	PC_GetState(pState);
-	pState->
+
 	WCHAR s[128];
 	_itow_s(PC_GetConfirmedProcessID(), s, 10);
-
-	if (PathFileExists(pFileName)) {
+	
+	WIN32_FILE_ATTRIBUTE_DATA       attribs;
+	GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
+	
+	FILETIME modifyTime = attribs.ftLastWriteTime;
+	if (CompareFileTime(&modifyTime, &oldModifyTime) >0) {
+		oldModifyTime = modifyTime;
+		string line;
+		ifstream myfile;
+		myfile.open(pFileName);
 		string textContents = "";
-		WIN32_FILE_ATTRIBUTE_DATA       attribs;
-		GetFileAttributesExW(pFileName, GetFileExInfoStandard, &attribs);
-
-		FILETIME modifyTime = attribs.ftLastWriteTime;
-		if (CompareFileTime(&modifyTime, &oldModifyTime) > 0) {
-			oldModifyTime = modifyTime;
-			string line;
-			ifstream myfile;
-			myfile.open(pFileName);
-			if (myfile.is_open())
+		if (myfile.is_open())
+		{
+			while (getline(myfile, line))
 			{
-				while (getline(myfile, line))
-				{
-					textContents += line;
-				}
-				myfile.close();
+				textContents += line;
 			}
-			textLength = textContents.length();
-			wcTextContents[textLength] = 0;
-			std::copy(textContents.begin(), textContents.end(), wcTextContents);
+			myfile.close();
 		}
+		textLength = textContents.length();
+		wcTextContents[textLength] = 0;
+		std::copy(textContents.begin(), textContents.end(), wcTextContents);
 	}
 	// draw back if required
 	if (bShowBackground)
